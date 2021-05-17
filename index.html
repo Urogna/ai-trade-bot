@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Document</title>
+	</head>
+	<body>
+        <div id="page-wrapper">
+            <div>
+                Select a text file: 
+                <input type="file" onChange="prepareData(event);" webkitdirectory mozdirectory msdirectory odirectory directory multiple>
+            </div>
+            <pre id="fileDisplayArea"><pre>
+        </div>
+        <p id="csvData"></p>
+        <button onClick="showContent(event)">Train</button>
+        
+        <button onClick="loadNet();">Load:</button>
+        <div>
+            <div>
+                Paste CSV of 30 days: 
+                <textarea id="inputText"></textarea>
+            </div>
+        </div>
+        <p id="outputData"></p>
+        <button onClick="showPrediction()">Predict</button>
+        <div>
+            <div>
+                Accuracy
+                <input type="file" onChange="showAccuracy(event)" webkitdirectory mozdirectory msdirectory odirectory directory multiple>
+            </div>
+        </div>
+        <p id="accuracyData"></p>
+        <script src="//unpkg.com/brain.js"></script>
+        <script src="//unpkg.com/papaparse@5.3.0/papaparse.min.js"></script>
+        <script src="main.js"></script>
+	</body>
+</html>
