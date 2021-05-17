@@ -5,7 +5,7 @@ const config = {
 	hiddenLayers: [25, 5],
 	binaryThresh: 0.5,
 	activation: "sigmoid", // supported activation types: ['sigmoid', 'relu', 'leaky-relu', 'tanh'],
-	leakyReluAlpha: 0.01, // supported for activation type 'leaky-relu'
+	// leakyReluAlpha: 0.01, // supported for activation type 'leaky-relu'
 }
 
 const DAYS_SPAN = 30
