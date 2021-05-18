@@ -2,7 +2,8 @@ import Head from "next/head"
 import Image from "next/image"
 import styles from "../styles/Home.module.css"
 import brain from "brain.js/src"
-import { useRef, useState } from "react"
+import { useState } from "react"
+import yahooFinance from "yahoo-finance2"
 
 export default function Home() {
 	// provide optional config object (or undefined). Defaults shown.
@@ -14,12 +15,14 @@ export default function Home() {
 		activation: "sigmoid", // supported activation types: ['sigmoid', 'relu', 'leaky-relu', 'tanh'],
 		// leakyReluAlpha: 0.01, // supported for activation type 'leaky-relu'
 	}
+	const [display, setDisplay] = useState("")
+	const [net, setNet] = useState(new brain.NeuralNetwork(config))
+	const [symbol, setSymbol] = useState("")
 
 	const DAYS_SPAN = 30
 	const MODIFIER = 10
 
 	// create a simple feed forward neural network with backpropagation
-	const [net, setNet] = useState(new brain.NeuralNetwork(config))
 
 	const prepareData = (e) => {
 		var csvType = "text/csv"
@@ -108,6 +111,27 @@ export default function Home() {
 		document.getElementById(
 			"outputData"
 		).innerHTML = `Output: ${JSON.stringify(output)}, Prev: ${previous}`
+	}
+	const showPredictionJSON = (data) => {
+		const results = data.results.map((i) => {
+			return Object.values(i)
+		})
+		const testData = results
+			.slice(results.length - 30, results.length)
+			.map((day, idx) => {
+				return (
+					(Math.min(
+						Math.max(MODIFIER * (day[4] / day[1] - 1), -1),
+						1
+					) +
+						1) /
+					2
+				)
+			})
+		console.log(testData)
+		const output = net.run(testData)
+		const previous = testData[testData.length - 1]
+		return JSON.stringify(output)
 	}
 
 	const showAccuracy = (e) => {
@@ -221,6 +245,27 @@ export default function Home() {
 			}
 		})
 	}
+
+	const showHistory = (e) => {
+		// let day = 86400000
+		// yahooFinance
+		// 	.historical(symbol, {
+		// 		period1: new Date().getTime() - 60 * day,
+		// 	})
+		// 	.then((res) => {
+		// 		return res.json()
+		// 	})
+		// 	.then((data) => {
+		// 		setDisplay(data)
+		// 	})
+		fetch(`api/${symbol}`)
+			.then((res) => {
+				return res.json()
+			})
+			.then((data) => {
+				setDisplay(showPredictionJSON(data))
+			})
+	}
 	return (
 		<div className={styles.container}>
 			<Head>
@@ -277,10 +322,17 @@ export default function Home() {
 			</div>
 			<p id="accuracyData"></p>
 			<div>
-				<input type="text" placeholder="Starting capital" />
-				<button onClick={() => /*startSimulation*/ {}}>
-					Start simulation
-				</button>
+				<input
+					type="text"
+					placeholder="Starting capital"
+					value={symbol}
+					onChange={(e) => {
+						e.preventDefault()
+						setSymbol(e.currentTarget.value)
+					}}
+				/>
+				<p>{JSON.stringify(display, null, 2)}</p>
+				<button onClick={showHistory}>Show history</button>
 			</div>
 		</div>
 	)
