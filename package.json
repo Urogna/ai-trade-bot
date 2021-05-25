@@ -9,10 +9,12 @@
 	},
 	"dependencies": {
 		"brain.js": "*",
+		"gpu": "^1.0.0",
 		"net": "^1.0.2",
 		"next": "^10.2.0",
 		"react": "^17.0.2",
 		"react-dom": "^17.0.2",
+		"react-papaparse": "^3.14.0",
 		"yahoo-finance2": "^1.10.4"
 	}
 }

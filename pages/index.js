@@ -2,22 +2,22 @@ import Head from "next/head"
 import Image from "next/image"
 import styles from "../styles/Home.module.css"
 import brain from "brain.js/src"
-import { useState } from "react"
-import yahooFinance from "yahoo-finance2"
+import { useEffect, useState } from "react"
+import Papa from 'papaparse'
 
 export default function Home() {
 	// provide optional config object (or undefined). Defaults shown.
 	const daysData = []
 	const finalData = []
 	const config = {
-		hiddenLayers: [25, 5],
+		// hiddenLayers: [25, 5],
 		binaryThresh: 0.5,
 		activation: "sigmoid", // supported activation types: ['sigmoid', 'relu', 'leaky-relu', 'tanh'],
 		// leakyReluAlpha: 0.01, // supported for activation type 'leaky-relu'
 	}
 	const [display, setDisplay] = useState("")
 	const [net, setNet] = useState(new brain.NeuralNetwork(config))
-	const [symbol, setSymbol] = useState("")
+	const [symbolCounter, setSymbolCounter] = useState(0)
 
 	const DAYS_SPAN = 30
 	const MODIFIER = 10
@@ -26,9 +26,8 @@ export default function Home() {
 
 	const prepareData = (e) => {
 		var csvType = "text/csv"
-
-		e.target.files.forEach((file) => {
-			if (file.type.match(csvType)) {
+		console.log(Array.from(e.currentTarget.files))
+		Array.from(e.currentTarget.files).forEach((file) => {
 				Papa.parse(file, {
 					dynamicTyping: true,
 					complete: (results) => {
@@ -56,29 +55,28 @@ export default function Home() {
 							}
 							daysData.push(result)
 						})
-						document.getElementById("csvData").innerHTML = `Ready ${
-							daysData.length
-						}: ${JSON.stringify(finalData)}`
+						document.getElementById("csvData").innerHTML = finalData.length
 					},
 				})
-			} else {
-				fileDisplayArea.innerText = "File not supported!"
-			}
 		})
 	}
 
 	const showContent = () => {
-		const t = new Date().getTime()
-		console.log(finalData)
-		net.train(finalData)
-		console.log(JSON.stringify(net.toJSON(), null, 2))
-		document.getElementById("csvData").innerHTML = `Ready [${
-			(new Date().getTime() - t) / 1000
-		}]<div>${JSON.stringify(net.toJSON(), null, 2)}</div>`
+		fetch('api/train', {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify(finalData)
+		}).then((res) => {
+			return res.json()
+		}).then((data) => {
+			console.log(JSON.stringify(data, null, 2))
+			document.getElementById("csvData").innerHTML = JSON.stringify(data, null, 2)
+			net.fromJSON(data)
+		})
 	}
 
 	const loadNet = () => {
-		fetch("data/nets/net_4.json")
+		fetch("data/nets/net_3.json")
 			.then((response) => {
 				return response.json()
 			})
@@ -112,7 +110,7 @@ export default function Home() {
 			"outputData"
 		).innerHTML = `Output: ${JSON.stringify(output)}, Prev: ${previous}`
 	}
-	const showPredictionJSON = (data) => {
+	const getPredictionJSON = (data) => {
 		const results = data.results.map((i) => {
 			return Object.values(i)
 		})
@@ -131,7 +129,7 @@ export default function Home() {
 		console.log(testData)
 		const output = net.run(testData)
 		const previous = testData[testData.length - 1]
-		return JSON.stringify(output)
+		return output['0']
 	}
 
 	const showAccuracy = (e) => {
@@ -145,10 +143,12 @@ export default function Home() {
 		let sumTop = 0
 		let counterTotal = 0
 		let sumTotal = 0
+		let averageWinTotal = 0
+		let averageLossTotal = 0
 		var csvType = "text/csv"
-		e.target.files.forEach((file) => {
+		Array.from(e.currentTarget.files).forEach((file) => {
 			const testData = []
-			if (file.type.match(csvType)) {
+			if (true) {
 				Papa.parse(file, {
 					dynamicTyping: true,
 					complete: (results) => {
@@ -189,7 +189,7 @@ export default function Home() {
 								} else {
 									sumTop++
 								}
-							} else if (output["0"] > 0.6 || output["0"] < 0.4) {
+							} else if (output["0"] > 0.52 || output["0"] < 0.48) {
 								if (output["0"] >= 0.5 && next >= 0.5) {
 									averageWin += testData[i][1]
 									counter++
@@ -216,14 +216,22 @@ export default function Home() {
 								}
 							}
 							if (
-								(output["0"] >= 0.5 && next >= 0.5) ||
-								(output["0"] < 0.5 && next < 0.5)
+								output["0"] >= 0.5 && next >= 0.5
+								
 							) {
+								averageWinTotal += testData[i][1]
 								counterTotal++
-								sumTotal++
+							} else if (output["0"] < 0.5 && next < 0.5) {
+								averageWinTotal += 1 / testData[i][1]
+								counterTotal++
 							} else {
-								sumTotal++
+								if (next >= 0.5) {
+									averageLossTotal += testData[i][1]
+								} else {
+									averageLossTotal += 1 / testData[i][1]
+								}
 							}
+							sumTotal++
 						}
 						document.getElementById(
 							"accuracyData"
@@ -237,7 +245,9 @@ export default function Home() {
 							(100 * counterTop) / sumTop
 						}% (${sumTop})</div><div>Total : ${
 							(100 * counterTotal) / sumTotal
-						}% (${sumTotal})</div>`
+						}% (${sumTotal} avg: ${averageWinTotal / counterTotal}, avg_l: ${
+							averageLossTotal / (sumTotal - counterTotal)
+						})</div>`
 					},
 				})
 			} else {
@@ -246,7 +256,7 @@ export default function Home() {
 		})
 	}
 
-	const showHistory = (e) => {
+	const showHistory = (symbol) => {
 		// let day = 86400000
 		// yahooFinance
 		// 	.historical(symbol, {
@@ -262,10 +272,16 @@ export default function Home() {
 			.then((res) => {
 				return res.json()
 			})
-			.then((data) => {
-				setDisplay(showPredictionJSON(data))
+			.then((data) => {	
+				const prediction = getPredictionJSON(data)
+				setDisplay(`${symbol} : ${prediction}`)
+				if(prediction < 0.6 && prediction > 0.4) {
+					
+				}
 			})
+		setSymbolCounter(symbolCounter + 1)
 	}
+
 	return (
 		<div className={styles.container}>
 			<Head>
@@ -322,7 +338,7 @@ export default function Home() {
 			</div>
 			<p id="accuracyData"></p>
 			<div>
-				<input
+				{/* <input
 					type="text"
 					placeholder="Starting capital"
 					value={symbol}
@@ -330,10 +346,118 @@ export default function Home() {
 						e.preventDefault()
 						setSymbol(e.currentTarget.value)
 					}}
-				/>
+				/> */}
 				<p>{JSON.stringify(display, null, 2)}</p>
-				<button onClick={showHistory}>Show history</button>
+				<button onClick={() => {
+					showHistory(symbols[symbolCounter])
+				}}>Show history</button>
 			</div>
 		</div>
 	)
 }
+
+const symbols = [
+	'TRX-USD',
+	'BTC-USD',
+	'AEP',
+	'EXC',
+	'XEL',
+	'ADBE',
+	'AMD',
+	'ADI',
+	'ANSS',
+	'AAPL',
+	'AMAT',
+	'ASML',
+	'TEAM',
+	'ADSK',
+	'ADP',
+	'AVGO',
+	'CDNS',
+	'CDW',
+	'CHKP',
+	'CSCO',
+	'CTSH',
+	'DOCU',
+	'FISV',
+	'INTC',
+	'INTU',
+	'KLAC',
+	'LRCX',
+	'MRVL',
+	'MXIM',
+	'MCHP',
+	'MU',
+	'MSFT',
+	'NVDA',
+	'NXPI',
+	'OKTA',
+	'PAYX',
+	'PYPL',
+	'QCOM',
+	'SWKS',
+	'SPLK',
+	'SNPS',
+	'TXN',
+	'VRSN',
+	'WDAY',
+	'XLNX',
+	'ZM',
+	'CTAS',
+	'CPRT',
+	'CSX',
+	'FAST',
+	'PCAR',
+	'VRSK',
+	'ALXN',
+	'ALGN',
+	'AMGN',
+	'BIIB',
+	'CERN',
+	'DXCM',
+	'GILD',
+	'IDXX',
+	'ILMN',
+	'INCY',
+	'ISRG',
+	'MRNA',
+	'REGN',
+	'SGEN',
+	'VRTX',
+	'COST',
+	'KDP',
+	'KHC',
+	'MDLZ',
+	'MNST',
+	'PEP',
+	'WBA',
+	'AMZN',
+	'BKNG',
+	'DLTR',
+	'EBAY',
+	'JD',
+	'LULU',
+	'MAR',
+	'MELI',
+	'ORLY',
+	'PTON',
+	'PDD',
+	'ROST',
+	'SBUX',
+	'TSLA',
+	'TCOM',
+	'ATVI',
+	'GOOGL',
+	'GOOG',
+	'BIDU',
+	'CMCSA',
+	'EA',
+	'FB',
+	'FOXA',
+	'FOX',
+	'MTCH',
+	'NTES',
+	'NFLX',
+	'SIRI',
+	'TMUS',
+]
